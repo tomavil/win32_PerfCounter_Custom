@@ -1,7 +1,7 @@
 [cultureinfo]::CurrentCulture = [cultureinfo]::InvariantCulture ##Is this needed?
 ## Define new class name and date
 $NewClassName = 'Win32_PerfCounter_Custom'
-$Date = get-date
+$Date = Get-Date -Format "yyyy'-'MM'-'dd HH':'mm':'ss'.'fff"
  
 ## Remove class if exists
 Remove-WmiObject $NewClassName -ErrorAction SilentlyContinue
@@ -27,11 +27,14 @@ $newClass.Properties.Add("highestUserProcName", [System.Management.CimType]::Str
 $newClass.Properties.Add("highestUserTime", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("highestWorkingSetProcName", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("highestWorkingSet", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("freePhysMemory", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("totalPhysMemory", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("freeDiskC", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("ScriptLastRan", [System.Management.CimType]::String, $false)
 $newClass.Properties["PerfCounterName"].Qualifiers.Add("Key", $true)
 $newClass.Put() | Out-Null
  
-$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 30 |
+$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 3 |
     select -ExpandProperty countersamples | select -ExpandProperty cookedvalue | Measure-Object -Average -Minimum -Maximum)
 
 $procs = Get-Process 
@@ -90,6 +93,9 @@ highestUserProcName = ($highestUserProcName)
 highestUserTime = "{0:N2}" -f ($highestUserTime)
 highestWorkingSetProcName =  ($highestWorkingSetProcName)
 highestWorkingSet = ($highestWorkingSet)
+freeDiskC = (Get-WMIObject -class Win32_logicaldisk | where {$_.DeviceID -eq 'C:'} | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
+freePhysMemory = (Get-Counter -Counter "\Memory\Available MBytes").CounterSamples[0].CookedValue
+totalPhysMemory = (Get-WMIObject -class Win32_PhysicalMemory | Measure-Object -Property capacity -Sum | % {[Math]::Round(($_.sum / 1MB),2)})
 
 ScriptLastRan = $Date
 } | Out-Null
