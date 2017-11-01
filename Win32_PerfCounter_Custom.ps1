@@ -34,7 +34,7 @@ $newClass.Properties.Add("ScriptLastRan", [System.Management.CimType]::String, $
 $newClass.Properties["PerfCounterName"].Qualifiers.Add("Key", $true)
 $newClass.Put() | Out-Null
  
-$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 3 |
+$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 30 |
     select -ExpandProperty countersamples | select -ExpandProperty cookedvalue | Measure-Object -Average -Minimum -Maximum)
 
 $procs = Get-Process 
