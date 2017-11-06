@@ -1,4 +1,3 @@
-[cultureinfo]::CurrentCulture = [cultureinfo]::InvariantCulture ##Is this needed?
 ## Define new class name and date
 $NewClassName = 'Win32_PerfCounter_Custom'
 $Date = Get-Date -Format "yyyy'-'MM'-'dd HH':'mm':'ss'.'fff"
@@ -78,24 +77,23 @@ $Uptime = $OS.ConvertToDateTime($OS.LocalDateTime) - $boottime
 	
  Set-WmiInstance -Namespace root\cimv2 -class $NewClassName -argument @{
 PerfCounterName = "General Performance Metrics"
-cpuavg = "{0:N2}" -f ($cpuload.Average)
-cpumin = "{0:N2}" -f ($cpuload.Minimum)
-cpumax = "{0:N2}" -f ($cpuload.Maximum )		
-processTimeTotal = "{0:N2}" -f ($processTimeTotal)
-kernelTimeTotal = "{0:N2}" -f ($kerneltimeTotal)
-userTimeTotal = "{0:N2}" -f ($usertimeTotal)
-uptimehours = "{0:N2}" -f ($UpTime.TotalHours)
-processTimePerc = "{0:N6}" -f ($processTimeTotal/($UpTime.TotalHours)*100) 
-#processTimePerc = ($processTimeTotal/([float]$UpTime.TotalHours))
+cpuavg = [math]::Round($cpuload.Average,2).ToString((New-Object Globalization.CultureInfo ""))
+cpumin = [math]::Round($cpuload.Minimum,2).ToString((New-Object Globalization.CultureInfo ""))
+cpumax = [math]::Round($cpuload.Maximum,2).ToString((New-Object Globalization.CultureInfo ""))
+processTimeTotal = [math]::Round($processTimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
+kernelTimeTotal = [math]::Round($kerneltimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
+userTimeTotal = [math]::Round($usertimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
+uptimehours = [math]::Round($UpTime.TotalHours,2).ToString((New-Object Globalization.CultureInfo ""))
+processTimePerc = [math]::Round($processTimeTotal/($UpTime.TotalHours)*100,6).ToString((New-Object Globalization.CultureInfo ""))
 highestKernelProcName = ($highestKernelProcName)
-highestKernelTime = "{0:N2}" -f ($highestKernelTime)
+highestKernelTime = [math]::Round($highestKernelTime,2).ToString((New-Object Globalization.CultureInfo ""))
 highestUserProcName = ($highestUserProcName)
-highestUserTime = "{0:N2}" -f ($highestUserTime)
+highestUserTime = [math]::Round($highestUserTime,2).ToString((New-Object Globalization.CultureInfo ""))
 highestWorkingSetProcName =  ($highestWorkingSetProcName)
-highestWorkingSet = ($highestWorkingSet)
+highestWorkingSet = [math]::Round($highestWorkingSet,0).ToString((New-Object Globalization.CultureInfo ""))
 freeDiskC = (Get-WMIObject -class Win32_logicaldisk | where {$_.DeviceID -eq 'C:'} | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
 freePhysMemory = (Get-Counter -Counter "\Memory\Available MBytes").CounterSamples[0].CookedValue
-totalPhysMemory = (Get-WMIObject -class Win32_PhysicalMemory | Measure-Object -Property capacity -Sum | % {[Math]::Round(($_.sum / 1MB),2)})
+totalPhysMemory = (Get-WMIObject -class Win32_PhysicalMemory | Measure-Object -Property capacity -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
 
 ScriptLastRan = $Date
 } | Out-Null
