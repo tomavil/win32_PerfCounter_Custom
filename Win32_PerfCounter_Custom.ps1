@@ -33,7 +33,7 @@ $newClass.Properties.Add("ScriptLastRan", [System.Management.CimType]::String, $
 $newClass.Properties["PerfCounterName"].Qualifiers.Add("Key", $true)
 $newClass.Put() | Out-Null
  
-$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 30 |
+$cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 1 |
     select -ExpandProperty countersamples | select -ExpandProperty cookedvalue | Measure-Object -Average -Minimum -Maximum)
 
 $procs = Get-Process 
@@ -45,9 +45,9 @@ $highestKernelTime = 0 ; $highestKernelProcName = ""
 $highestUserTime = 0 ; $highestUserProcName = ""
 
 foreach ($proc in $procs) {
-$processTime= $proc.TotalProcessorTime.Hours
-$kernelTime=$proc.PrivilegedProcessorTime.TotalHours
-$userTime=$proc.UserProcessorTime.TotalHours
+$processTime= $proc.TotalProcessorTime.TotalSeconds
+$kernelTime=$proc.PrivilegedProcessorTime.TotalSeconds
+$userTime=$proc.UserProcessorTime.TotalSeconds
 $workingSet=$proc.PeakWorkingSet/1MB
 if ($kernelTime -gt $highestKernelTime) {
  $highestKernelTime = $kernelTime  
@@ -70,7 +70,6 @@ $kernelTimeTotal+=$kernelTime
 $userTimeTotal+=$userTime
 
 }
-
 $OS = Get-WmiObject win32_operatingsystem 
 $BootTime = $OS.ConvertToDateTime($OS.LastBootUpTime) 
 $Uptime = $OS.ConvertToDateTime($OS.LocalDateTime) - $boottime 
@@ -80,15 +79,15 @@ PerfCounterName = "General Performance Metrics"
 cpuavg = [math]::Round($cpuload.Average,2).ToString((New-Object Globalization.CultureInfo ""))
 cpumin = [math]::Round($cpuload.Minimum,2).ToString((New-Object Globalization.CultureInfo ""))
 cpumax = [math]::Round($cpuload.Maximum,2).ToString((New-Object Globalization.CultureInfo ""))
-processTimeTotal = [math]::Round($processTimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
-kernelTimeTotal = [math]::Round($kerneltimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
-userTimeTotal = [math]::Round($usertimeTotal,2).ToString((New-Object Globalization.CultureInfo ""))
-uptimehours = [math]::Round($UpTime.TotalHours,2).ToString((New-Object Globalization.CultureInfo ""))
-processTimePerc = [math]::Round($processTimeTotal/($UpTime.TotalHours)*100,6).ToString((New-Object Globalization.CultureInfo ""))
+processTimeTotal = [math]::Round($processTimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
+kernelTimeTotal = [math]::Round($kerneltimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
+userTimeTotal = [math]::Round($usertimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
+uptimehours = [math]::Round($UpTime.TotalSeconds/3600,2).ToString((New-Object Globalization.CultureInfo ""))
+processTimePerc = [math]::Round($processTimeTotal/($UpTime.TotalSeconds)*100,6).ToString((New-Object Globalization.CultureInfo ""))
 highestKernelProcName = ($highestKernelProcName)
-highestKernelTime = [math]::Round($highestKernelTime,2).ToString((New-Object Globalization.CultureInfo ""))
+highestKernelTime = [math]::Round($highestKernelTime/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 highestUserProcName = ($highestUserProcName)
-highestUserTime = [math]::Round($highestUserTime,2).ToString((New-Object Globalization.CultureInfo ""))
+highestUserTime = [math]::Round($highestUserTime/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 highestWorkingSetProcName =  ($highestWorkingSetProcName)
 highestWorkingSet = [math]::Round($highestWorkingSet,0).ToString((New-Object Globalization.CultureInfo ""))
 freeDiskC = (Get-WMIObject -class Win32_logicaldisk | where {$_.DeviceID -eq 'C:'} | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
