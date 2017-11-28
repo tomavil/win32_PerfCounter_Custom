@@ -5,11 +5,17 @@ $osVer = (Get-WmiObject Win32_OperatingSystem).Version
 $newClassName = 'Win32_PerfCounter_Custom'
 $date = Get-Date -Format "yyyy'-'MM'-'dd HH':'mm':'ss'.'fff"
  
-## Remove older revision
+## Remove older revision or older than 24h 
 If ((Get-WmiObject -class win32_perfcounter_custom -list) -ne $null) {
 	If ((Get-WmiObject Win32_PerfCounter_Custom).perfCounterRevision -lt $perfCounterRevision) {
 		Remove-WmiObject $newClassName -ErrorAction SilentlyContinue
 	}
+	$classInstances = Get-WmiObject -class win32_perfcounter_custom
+	ForEach ($classInstance in $classInstances) {
+		If ([datetime]$classInstance.scriptLastRan -lt (get-date).addhours(-24)) {
+			$classInstance | Remove-WmiObject
+		}
+	}	
 }
 
 # Create new WMI class
@@ -60,7 +66,7 @@ $workingSet = 0 ; $highestWorkingSet = 0 ; $highestWorkingSetProcName = ""
 $highestKernelTime = 0 ; $highestKernelProcName = ""
 $highestUserTime = 0 ; $highestUserProcName = ""
 
-foreach ($proc in $procs) {
+ForEach ($proc in $procs) {
 	$processTime= $proc.TotalProcessorTime.TotalSeconds
 	$kernelTime=$proc.PrivilegedProcessorTime.TotalSeconds
 	$userTime=$proc.UserProcessorTime.TotalSeconds
