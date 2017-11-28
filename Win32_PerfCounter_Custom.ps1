@@ -1,17 +1,24 @@
+$perfCounterRevision = 10
+$osVer = (Get-WmiObject Win32_OperatingSystem).Version
+
 ## Define new class name and date
-$NewClassName = 'Win32_PerfCounter_Custom'
-$Date = Get-Date -Format "yyyy'-'MM'-'dd HH':'mm':'ss'.'fff"
+$newClassName = 'Win32_PerfCounter_Custom'
+$date = Get-Date -Format "yyyy'-'MM'-'dd HH':'mm':'ss'.'fff"
  
-## Remove class if exists
-Remove-WmiObject $NewClassName -ErrorAction SilentlyContinue
- 
+## Remove older revision
+If ((Get-WmiObject -class win32_perfcounter_custom -list) -ne $null) {
+	If ((Get-WmiObject Win32_PerfCounter_Custom).perfCounterRevision -lt $perfCounterRevision) {
+		Remove-WmiObject $newClassName -ErrorAction SilentlyContinue
+	}
+}
+
 # Create new WMI class
 $newClass = New-Object System.Management.ManagementClass ("root\cimv2", [String]::Empty, $null)
-$newClass["__CLASS"] = $NewClassName
- 
+$newClass["__CLASS"] = $newClassName
+  
 ## Create properties you want inventoried   !SCCM hardware inventory converts everything to nvarchar(255), String = less headache in SQL!
-$newClass.Qualifiers.Add("Static", $true)
-$newClass.Properties.Add("PerfCounterName", [System.Management.CimType]::String, $false)
+$newClass.Qualifiers.Add("static", $true)
+$newClass.Properties.Add("perfCounterName", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("cpuavg", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("cpumin", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("cpumax", [System.Management.CimType]::String, $false)
@@ -28,10 +35,18 @@ $newClass.Properties.Add("highestWorkingSetProcName", [System.Management.CimType
 $newClass.Properties.Add("highestWorkingSet", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("freePhysMemory", [System.Management.CimType]::String, $false)
 $newClass.Properties.Add("totalPhysMemory", [System.Management.CimType]::String, $false)
-$newClass.Properties.Add("freeDiskC", [System.Management.CimType]::String, $false)
-$newClass.Properties.Add("SystemStabilityIndex", [System.Management.CimType]::String, $false)
-$newClass.Properties.Add("ScriptLastRan", [System.Management.CimType]::String, $false)
-$newClass.Properties["PerfCounterName"].Qualifiers.Add("Key", $true)
+$newClass.Properties.Add("disk0ID", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk0Free", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk1ID", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk1Free", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk2ID", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk2Free", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk3ID", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("disk3Free", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("systemStabilityIndex", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("scriptLastRan", [System.Management.CimType]::String, $false)
+$newClass.Properties.Add("perfCounterRevision", [System.Management.CimType]::String, $false)
+$newClass.Properties["scriptLastRan"].Qualifiers.Add("Key", $true)
 $newClass.Put() | Out-Null
  
 $cpuload=(get-counter -Counter "\Processor(_Total)\% Processor Time" -SampleInterval 1 -MaxSamples 30 |
@@ -71,8 +86,10 @@ foreach ($proc in $procs) {
 	$userTimeTotal+=$userTime
 }
 $OS = Get-WmiObject win32_operatingsystem 
-$BootTime = $OS.ConvertToDateTime($OS.LastBootUpTime) 
-$Uptime = $OS.ConvertToDateTime($OS.LocalDateTime) - $boottime 
+$bootTime = $OS.ConvertToDateTime($OS.LastBootUpTime) 
+$uptime = $OS.ConvertToDateTime($OS.LocalDateTime) - $boottime 
+
+$disks=(Get-WMIObject -class Win32_LogicalDisk -filter Drivetype=3 | Sort-Object FreeSpace)
 	
  Set-WmiInstance -Namespace root\cimv2 -class $NewClassName -argument @{
 	PerfCounterName = "General Performance Metrics"
@@ -82,31 +99,39 @@ $Uptime = $OS.ConvertToDateTime($OS.LocalDateTime) - $boottime
 	processTimeTotal = [math]::Round($processTimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 	kernelTimeTotal = [math]::Round($kerneltimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 	userTimeTotal = [math]::Round($usertimeTotal/3600,2).ToString((New-Object Globalization.CultureInfo ""))
-	uptimehours = [math]::Round($UpTime.TotalSeconds/3600,2).ToString((New-Object Globalization.CultureInfo ""))
-	processTimePerc = [math]::Round($processTimeTotal/($UpTime.TotalSeconds)*100,6).ToString((New-Object Globalization.CultureInfo ""))
+	uptimehours = [math]::Round($upTime.TotalSeconds/3600,2).ToString((New-Object Globalization.CultureInfo ""))
+	processTimePerc = [math]::Round($processTimeTotal/($upTime.TotalSeconds)*100,6).ToString((New-Object Globalization.CultureInfo ""))
 	highestKernelProcName = ($highestKernelProcName)
 	highestKernelTime = [math]::Round($highestKernelTime/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 	highestUserProcName = ($highestUserProcName)
 	highestUserTime = [math]::Round($highestUserTime/3600,2).ToString((New-Object Globalization.CultureInfo ""))
 	highestWorkingSetProcName =  ($highestWorkingSetProcName)
 	highestWorkingSet = [math]::Round($highestWorkingSet,0).ToString((New-Object Globalization.CultureInfo ""))
-	freeDiskC = (Get-WMIObject -class Win32_logicaldisk | where {$_.DeviceID -eq 'C:'} | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
+	disk0free = $disks[0] | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)}
+	disk0ID = $disks[0].DeviceID
+	disk1Free = $disks[1] | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)}
+	disk1ID = $disks[1].DeviceID
+	disk2Free = $disks[2] | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)}
+	disk2ID = $disks[2].DeviceID
+	disk3Free = $disks[3] | Measure-Object -Property freespace -Sum | % {[Math]::Round(($_.sum / 1MB),0)}
+	disk3ID = $disks[3].DeviceID
 	freePhysMemory = (Get-Counter -Counter "\Memory\Available MBytes").CounterSamples[0].CookedValue
 	totalPhysMemory = (Get-WMIObject -class Win32_PhysicalMemory | Measure-Object -Property capacity -Sum | % {[Math]::Round(($_.sum / 1MB),0)})
 	SystemStabilityIndex = [math]::Round((Get-WMIObject -class Win32_ReliabilityStabilityMetrics | Select -first 1).SystemStabilityIndex,3).ToString((New-Object Globalization.CultureInfo ""))
-
-	ScriptLastRan = $Date
+    perfCounterRevision = $perfCounterRevision
+	scriptLastRan = $date
 } | Out-Null
 
-If ($osVer -lt 6.2) { #Server older than 2012, trigger RAC manually for next run
-	set-itemproperty hklm:'\SOFTWARE\Microsoft\Reliability Analysis\WMI' -name 'wmienable' -value 1 
-
-	$s = new-object -com("Schedule.Service") 
-	$s.connect() 
-	$x=$s.GetFolder('\Microsoft\Windows\RAC').gettask('ractask').definition 
-	$x.triggers.item(2).enabled=$true 
-	$s.GetFolder('\Microsoft\Windows\RAC').registertaskdefinition('ractask',$x,6,'LocalService',$null,5) | Out-Null
-	$s.GetFolder('\Microsoft\Windows\RAC').gettask('ractask').run(0) | Out-Null
+If ($osVer -lt 6.2) { #Server older than 2012 - enable reliability analysis,trigger RAC manually for next run
+   If ((Get-ItemProperty hklm:'\SOFTWARE\Microsoft\Reliability Analysis\WMI' -name 'WMIEnable').WMIEnable -ne 1) {
+		Set-ItemProperty hklm:'\SOFTWARE\Microsoft\Reliability Analysis\WMI' -name 'WMIEnable' -value 1 
+		$s = new-object -com("Schedule.Service") 
+		$s.connect() 
+		$x=$s.GetFolder('\Microsoft\Windows\RAC').gettask('ractask').definition 
+		$x.triggers.item(2).enabled=$true 
+		$s.GetFolder('\Microsoft\Windows\RAC').registertaskdefinition('ractask',$x,6,'LocalService',$null,5) | Out-Null
+		$s.GetFolder('\Microsoft\Windows\RAC').gettask('ractask').run(0) | Out-Null
+	}
 }
 
 
